@@ -18,3 +18,5 @@ a { color: inherit; }
   html { scroll-behavior: auto !important; }
   *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .15s !important; }
 }
+
+code, kbd, samp, pre { font-family: inherit; } /* UA stylesheet otherwise forces generic monospace */

@@ -22,6 +22,8 @@ const args = process.argv.slice(2)
 const url = args.find((a) => /^https?:/.test(a)) || 'http://localhost:5173'
 const outDir = path.resolve(args[args.indexOf('--out') + 1] && args.includes('--out') ? args[args.indexOf('--out') + 1] : '.sotd-audit')
 const pages = args.includes('--pages') ? args[args.indexOf('--pages') + 1].split(',') : ['/']
+// --before "<js>": run in the page before measuring (e.g. scroll a transformation to its final state)
+const before = args.includes('--before') ? args[args.indexOf('--before') + 1] : null
 fs.mkdirSync(outDir, { recursive: true })
 const GPU = ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist']
 const report = []
@@ -41,9 +43,9 @@ const PROBE = () => {
     const el = n.parentElement; const cs = getComputedStyle(el)
     if (cs.visibility === 'hidden' || cs.display === 'none') continue
     const r = el.getBoundingClientRect(); if (r.width < 1 || r.height < 1) continue
-    items.push({ t, fs: parseFloat(cs.fontSize), ff: cs.fontFamily.split(',')[0].replace(/["']/g, '').trim(), fw: cs.fontWeight, ls: parseFloat(cs.letterSpacing) || 0, lh: parseFloat(cs.lineHeight) || null, tt: cs.textTransform, fst: cs.fontStyle, top: r.top + scrollY, op: +cs.opacity, len: t.length })
+    items.push({ t, fs: parseFloat(cs.fontSize), ff: cs.fontFamily.split(',')[0].replace(/["']/g, '').trim(), fw: cs.fontWeight, ls: parseFloat(cs.letterSpacing) || 0, lh: parseFloat(cs.lineHeight) || null, tt: cs.textTransform, fst: cs.fontStyle, top: r.top + scrollY, vt: r.top, op: +cs.opacity, len: t.length })
   }
-  const fold = items.filter((i) => i.top < vh)
+  const fold = items.filter((i) => i.vt < vh && i.vt + i.fs > 0)
   const hero = fold.slice().sort((a, b) => b.fs - a.fs)[0] || null
   const longs = items.filter((i) => i.len > 60).map((i) => i.fs).sort((a, b) => a - b)
   const body = longs[Math.floor(longs.length / 2)] || null
@@ -57,18 +59,18 @@ const PROBE = () => {
     const kids = [...parent.children].filter((k) => { const cs = getComputedStyle(k); const r = k.getBoundingClientRect(); return parseFloat(cs.borderRadius) >= 12 && (cs.boxShadow !== 'none' || cs.borderStyle !== 'none' || cs.backgroundColor !== 'rgba(0, 0, 0, 0)') && r.width > 180 && r.height > 140 && r.width < vw * 0.5 })
     if (kids.length >= 3) { const w = kids.map((k) => Math.round(k.getBoundingClientRect().width / 10)); if (new Set(w).size <= 2) cardGrids++ }
   }
-  const gradients = all.filter((e) => /(linear|radial|conic)-gradient/.test(getComputedStyle(e).backgroundImage) && e.getBoundingClientRect().width > vw * 0.4).length
+  const gradients = all.filter((e) => { const b = getComputedStyle(e).backgroundImage; return /(^|, )(linear|radial|conic)-gradient/.test(b) && !/^repeating-/.test(b) && e.getBoundingClientRect().width > vw * 0.4 }).length
   const purpleGrad = all.some((e) => { const b = getComputedStyle(e).backgroundImage; return /gradient/.test(b) && /rgb\((1[0-9][0-9]|[6-9][0-9]), ([0-9]{1,2}|1[0-4][0-9]), (2[0-5][0-9]|1[89][0-9])\)/.test(b) })
   const text = document.body.innerText
   const emoji = (text.match(/\p{Emoji_Presentation}/gu) || []).length
-  const lorem = /lorem ipsum|dolor sit amet|placeholder|your (company|logo|brand) here|todo:/i.test(text)
+  const lorem = /lorem ipsum|dolor sit amet|\[placeholder\]|placeholder text|your (company|logo|brand|headline) here|insert .{1,20} here|todo:/i.test(text)
   const h1 = document.querySelector('h1')
   const h1cs = h1 && getComputedStyle(h1)
   const heroButtons = h1 ? [...document.querySelectorAll('a,button')].filter((b) => { const r = b.getBoundingClientRect(); return r.top < vh && r.top > h1.getBoundingClientRect().bottom - 10 && r.width > 100 && r.height > 36 }).length : 0
   const centeredHeroCTA = !!h1 && h1cs.textAlign === 'center' && heroButtons >= 2
   const imgsNoAlt = [...document.images].filter((i) => !i.hasAttribute('alt')).length
   const unnamed = [...document.querySelectorAll('a,button')].filter((b) => !(b.innerText.trim() || b.getAttribute('aria-label') || b.getAttribute('title') || b.querySelector('img[alt]:not([alt=""]),svg[aria-label],[aria-label]'))).length
-  const hiddenText = items.filter((i) => i.op === 0 && i.len > 3 && i.top < vh).length
+  const hiddenText = items.filter((i) => i.op === 0 && i.len > 3 && i.vt < vh && i.vt > -i.fs).length
   const meta = { title: document.title, description: !!document.querySelector('meta[name=description]'), og: !!document.querySelector('meta[property="og:image"]'), lang: document.documentElement.lang, viewport: !!document.querySelector('meta[name=viewport]'), h1s: document.querySelectorAll('h1').length, main: !!document.querySelector('main'), nav: !!document.querySelector('nav') }
   const canv = [...document.querySelectorAll('canvas')].map((c) => { const r = c.getBoundingClientRect(); return (r.width * r.height) / (vw * vh) })
   return {
@@ -100,6 +102,7 @@ for (const p of pages) {
   const loadMs = Date.now() - t0
   const fcp = await page.evaluate(() => performance.getEntriesByName('first-contentful-paint')[0]?.startTime || null)
   await page.waitForTimeout(3500)
+  if (before) { await page.evaluate(before); await page.waitForTimeout(2500); R(`(measured after --before: ${before.slice(0, 80)})`) }
   const m = await page.evaluate(PROBE)
   const slug = p.replace(/\W+/g, '_') || 'home'
   const H = await page.evaluate(() => document.documentElement.scrollHeight)

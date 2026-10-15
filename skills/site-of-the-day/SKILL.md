@@ -61,7 +61,7 @@ Run the app, then:
 ```bash
 node <skill>/scripts/audit.mjs http://localhost:5173 --out .sotd-audit
 ```
-It measures your site with the exact probes used on the 808 winners, prints where you fall in the winner distributions, flags jury-risk patterns (card grids, centered hero + 2 CTAs, purple gradients, emoji, italic-serif reflex, placeholders), checks overflow at 390/360/768, reduced motion, focus, alt text, metadata, scroll frame times, and writes a contact sheet. **Look at the contact sheet** next to your 3 references and run the critique protocol in `references/12-critique.md` (jury simulation with score anchors). Fix the three most damaging problems. Re-run. Do this at least twice. Only claim what you verified.
+If the page's real state only exists after scrolling (a transformation, a pinned sequence, a deliberate "before" state), measure that state too: `--before "window.scrollTo(0, 5200)"`. It measures your site with the exact probes used on the 808 winners, prints where you fall in the winner distributions, flags jury-risk patterns (card grids, centered hero + 2 CTAs, purple gradients, emoji, italic-serif reflex, placeholders), checks overflow at 390/360/768, reduced motion, focus, alt text, metadata, scroll frame times, and writes a contact sheet. **Look at the contact sheet** next to your 3 references and run the critique protocol in `references/12-critique.md` (jury simulation with score anchors). Fix the three most damaging problems. Re-run. Do this at least twice. Only claim what you verified.
 
 ## Hard rules
 - One idea per site. If you can describe it with "and", cut half.
