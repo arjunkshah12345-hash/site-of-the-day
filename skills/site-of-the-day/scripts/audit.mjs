@@ -21,7 +21,7 @@ const B = JSON.parse(fs.readFileSync(path.join(SKILL, 'data/benchmarks.json'), '
 const args = process.argv.slice(2)
 const url = args.find((a) => /^https?:/.test(a)) || 'http://localhost:5173'
 const outDir = path.resolve(args[args.indexOf('--out') + 1] && args.includes('--out') ? args[args.indexOf('--out') + 1] : '.sotd-audit')
-const pages = args.includes('--pages') ? args[args.indexOf('--pages') + 1].split(',') : ['/']
+const pages = args.includes('--pages') ? args[args.indexOf('--pages') + 1].split(',') : [url] // default: exactly the URL given (keeps subpaths)
 // --before "<js>": run in the page before measuring (e.g. scroll a transformation to its final state)
 const before = args.includes('--before') ? args[args.indexOf('--before') + 1] : null
 fs.mkdirSync(outDir, { recursive: true })
@@ -42,7 +42,7 @@ const PROBE = () => {
     const t = n.textContent.trim(); if (!t) continue
     const el = n.parentElement; const cs = getComputedStyle(el)
     if (cs.visibility === 'hidden' || cs.display === 'none') continue
-    const r = el.getBoundingClientRect(); if (r.width < 1 || r.height < 1) continue
+    const r = el.getBoundingClientRect(); if (r.width <= 1 || r.height <= 1) continue // skip sr-only / clipped text
     items.push({ t, fs: parseFloat(cs.fontSize), ff: cs.fontFamily.split(',')[0].replace(/["']/g, '').trim(), fw: cs.fontWeight, ls: parseFloat(cs.letterSpacing) || 0, lh: parseFloat(cs.lineHeight) || null, tt: cs.textTransform, fst: cs.fontStyle, top: r.top + scrollY, vt: r.top, op: +cs.opacity, len: t.length })
   }
   const fold = items.filter((i) => i.vt < vh && i.vt + i.fs > 0)
@@ -79,6 +79,8 @@ const PROBE = () => {
     italicSerifDisplay: items.some((i) => i.fst === 'italic' && i.fs > 30 && /serif|instrument|playfair|cormorant|garamond|editorial|canela|fraunces/i.test(i.ff)),
     pageViewports: +(document.documentElement.scrollHeight / vh).toFixed(1), cardGrids, gradients, purpleGrad, emoji, lorem, centeredHeroCTA, imgsNoAlt, unnamed, hiddenText, meta,
     webglCover: +Math.max(0, ...canv).toFixed(2), videos: document.querySelectorAll('video').length,
+    // a large image / svg in the first viewport also counts as a dominant element
+    mediaCover: +Math.max(0, ...[...document.querySelectorAll('img, svg, picture')].map((m) => { const r = m.getBoundingClientRect(); const w = Math.max(0, Math.min(r.right, vw) - Math.max(r.left, 0)), h = Math.max(0, Math.min(r.bottom, vh) - Math.max(r.top, 0)); return (w * h) / (vw * vh) })).toFixed(2),
     smooth: [...document.documentElement.classList].some((c) => c.startsWith('lenis')) || !!window.lenis,
     gsap: !!window.gsap || [...document.querySelectorAll('[style]')].some((e) => /translate: none; rotate: none; scale: none/.test(e.getAttribute('style'))),
   }
@@ -167,7 +169,7 @@ for (const p of pages) {
   m.lorem ? FAIL('Placeholder / lorem / TODO text present.') : PASS('No placeholder copy')
   m.italicSerifDisplay ? WARN(`Italic serif display type: used by only ${(B.adoption.italicSerifDisplay * 100).toFixed(0)}% of winners and correlated with slightly lower scores. It is the default "editorial" move of generated sites — keep only if the concept demands it.`) : PASS('No reflexive italic-serif accent word')
   m.families.length > 3 ? WARN(`${m.families.length} font families — winners use 2 (p50), 3 at most.`) : PASS(`${m.families.length} font families`)
-  if (m.hero && m.hero.vw < B.heroTypeVw.p25 && m.webglCover < 0.5 && !m.videos) WARN(`Largest type is only ${m.hero.vw}vw with no full-screen image/WebGL/video carrying the hero — the first viewport likely lacks a dominant element.`)
+  if (m.hero && m.hero.vw < B.heroTypeVw.p25 && m.webglCover < 0.5 && !m.videos && m.mediaCover < 0.2) WARN(`Largest type is only ${m.hero.vw}vw with no full-screen image/WebGL/video carrying the hero — the first viewport likely lacks a dominant element.`)
   if (m.scale && m.scale < B.scaleRatio.p25) WARN(`Type scale contrast ${m.scale}× is in the bottom quartile of winners — hierarchy will read flat.`)
 
   R('\n### Developer-award basics (WPO, RWD, markup, a11y)')

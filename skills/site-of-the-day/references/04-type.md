@@ -52,6 +52,7 @@ document.fonts.ready.then(() => document.querySelectorAll('[data-fit]').forEach(
 addEventListener('resize', () => document.querySelectorAll('[data-fit]').forEach(fit))
 ```
    Or SVG `<text>` with a viewBox from `getBBox()` (pixel-exact, scales with CSS width).
+   **Grid trap:** if the fitted element sits in a CSS grid with implicit/`auto` columns, the column grows to the text's *pre-fit* width and you fit to the wrong number (overflow on phones). Give the container `grid-template-columns: minmax(0, 1fr)` (or `min-width: 0` on the item).
 6. **Body copy is short and big enough**: 16–19px, max 60ch, high contrast. Juries read.
 7. **Mobile is a separate typographic edition**: re-break lines by hand (`<br class="d">` / spans per breakpoint), change alignment, don't just scale down. Display on mobile is often bigger relative to width (15–25vw).
 8. **No faux styles** (synthetic bold/italic). Load the real files. `font-display: swap` + preload the display face; avoid layout shift by sizing containers.
